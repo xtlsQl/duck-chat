@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caveduck 채팅 아카이브</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8; --panel: #fffef9; --border: #e0d8c8; --border-dark: #c8bda8;
+    --text: #2a2318; --text-muted: #8a7e6e; --accent: #8b6914;
+    --accent-light: #f0e4c0; --accent-hover: #6d5210; --highlight: #f5d76e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 56px; position: sticky; top: 0; z-index: 100; }
+  .logo { font-family: 'Noto Serif KR', serif; font-size: 17px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .search-wrap { flex: 1; max-width: 480px; position: relative; }
+  .search-wrap input { width: 100%; height: 36px; border: 1px solid var(--border-dark); border-radius: 6px; padding: 0 12px 0 36px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); outline: none; transition: border-color .15s; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; font-size: 14px; }
+  .filter-pills { display: flex; gap: 6px; }
+  .pill { padding: 4px 12px; border-radius: 99px; font-size: 12px; border: 1px solid var(--border-dark); background: transparent; color: var(--text-muted); cursor: pointer; font-family: 'Noto Sans KR', sans-serif; transition: all .12s; white-space: nowrap; }
+  .pill:hover { border-color: var(--accent); color: var(--accent); }
+  .pill.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .stats { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .export-btn { padding: 6px 14px; font-size: 12px; font-family: 'Noto Sans KR', sans-serif; background: transparent; border: 1px solid var(--border-dark); border-radius: 6px; color: var(--text-muted); cursor: pointer; transition: all .12s; white-space: nowrap; }
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+  .layout { display: flex; flex: 1; height: calc(100vh - 56px); }
+  .sidebar { width: 240px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-top { padding: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .load-btn { width: 100%; padding: 8px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; background: var(--accent-light); border: 1px solid var(--border-dark); border-radius: 6px; color: var(--accent-hover); cursor: pointer; transition: all .12s; text-align: center; }
+  .load-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .load-input { display: none; }
+  .sidebar-head { padding: 10px 16px 8px; font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: .06em; text-transform: uppercase; }
+  .file-list { flex: 1; overflow-y: auto; padding: 0 0 8px; }
+  .file-item { padding: 9px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; border-left: 2.5px solid transparent; transition: background .12s, border-color .12s; }
+  .file-item:hover { background: var(--accent-light); }
+  .file-item.active { border-left-color: var(--accent); background: var(--accent-light); }
+  .file-item.active .file-name { color: var(--accent-hover); font-weight: 500; }
+  .file-name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 11px; color: var(--text-muted); }
+
+  .drag-overlay { display: none; position: fixed; inset: 0; background: rgba(139,105,20,0.08); border: 3px dashed var(--accent); z-index: 999; align-items: center; justify-content: center; font-size: 20px; color: var(--accent); font-family: 'Noto Serif KR', serif; pointer-events: none; }
+  .drag-overlay.show { display: flex; }
+
+  .main { flex: 1; overflow-y: auto; padding: 24px 32px; }
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--text-muted); }
+  .empty-icon { font-size: 48px; opacity: .3; }
+  .empty h2 { font-family: 'Noto Serif KR', serif; font-size: 20px; color: var(--text); font-weight: 600; }
+  .empty p { font-size: 14px; text-align: center; line-height: 1.7; }
+
+  .result-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .result-title { font-family: 'Noto Serif KR', serif; font-size: 18px; font-weight: 600; color: var(--text); }
+  .result-count { font-size: 12px; color: var(--text-muted); }
+
+  .chat-list { display: flex; flex-direction: column; gap: 16px; }
+  .chat-pair { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .chat-pair.has-match { border-color: var(--accent); }
+  .chat-pair-header { padding: 7px 16px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+  .pair-num { color: var(--accent); font-weight: 500; }
+  .pair-time { color: var(--text-muted); margin-left: auto; }
+
+  .user-side { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: flex-end; }
+  .user-bubble { background: var(--accent-light); border-radius: 12px 12px 2px 12px; padding: 8px 14px; font-size: 14px; line-height: 1.7; color: var(--text); max-width: 80%; }
+
+  .ai-side { padding: 12px 16px; display: flex; flex-direction: column; gap: 5px; }
+  .msg-line { font-size: 14px; line-height: 1.85; padding: 4px 8px; border-radius: 5px; }
+  .msg-line.dialogue { color: var(--text); }
+  .msg-line.narration { color: var(--text-muted); font-style: italic; font-size: 13px; background: var(--bg); }
+  .msg-line mark { background: var(--highlight); color: var(--text); border-radius: 2px; padding: 0 1px; font-style: normal; }
+
+  .no-results { text-align: center; padding: 60px 0; color: var(--text-muted); font-size: 14px; }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<div class="drag-overlay" id="dragOverlay">📂 여기에 놓으세요</div>
+
+<header>
+  <div class="logo">📜 Caveduck 아카이브</div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="메시지 검색..." oninput="doSearch()">
+  </div>
+  <div class="filter-pills">
+    <button class="pill on" data-f="all" onclick="setFilter('all')">전체</button>
+    <button class="pill" data-f="대사" onclick="setFilter('대사')">대사만</button>
+    <button class="pill" data-f="지문" onclick="setFilter('지문')">지문만</button>
+  </div>
+  <div class="stats" id="statsText">파일 없음</div>
+  <button class="export-btn" onclick="exportCurrent()">내보내기</button>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <button class="load-btn" onclick="document.getElementById('fileInput').click()">
+        📂 JSON 파일 불러오기
+      </button>
+      <input type="file" id="fileInput" class="load-input" accept=".json" multiple onchange="loadFiles(this.files)">
+    </div>
+    <div class="sidebar-head">저장된 대화</div>
+    <div class="file-list" id="fileList"></div>
+  </aside>
+
+  <main class="main" id="mainArea">
+    <div class="empty">
+      <div class="empty-icon">📂</div>
+      <h2>대화 파일을 불러오세요</h2>
+      <p>왼쪽 상단 버튼을 클릭하거나<br>JSON 파일을 화면에 드래그 앤 드롭하세요.<br><br>
+      <small style="color:var(--text-muted)">✅ 공식 TalkFile JSON<br>✅ 북마클릿으로 저장한 JSON</small></p>
+    </div>
+  </main>
+</div>
+
+<script>
+let files = [];
+let activeIdx = -1;
+let currentFilter = 'all';
+
+// 드래그앤드롭
+const overlay = document.getElementById('dragOverlay');
+let dragCounter = 0;
+document.addEventListener('dragenter', e => { e.preventDefault(); dragCounter++; overlay.classList.add('show'); });
+document.addEventListener('dragleave', () => { dragCounter--; if(dragCounter<=0){ dragCounter=0; overlay.classList.remove('show'); }});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); dragCounter=0; overlay.classList.remove('show'); loadFiles(e.dataTransfer.files); });
+
+// ── 파싱 ──────────────────────────────────────────
+
+// 공식 TalkFile: answer 텍스트 → {type, text}[] 로 분해
+function parseAnswerText(raw) {
+  // <details>...</details> 제거
+  const body = raw.replace(/<details>[\s\S]*?<\/details>/g, '').trim();
+  // 단락 분리
+  const parts = body.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+  const msgs = [];
+  parts.forEach(part => {
+    // 단락 안에서 *지문*과 대사 섞여있을 수 있으니 줄 단위로
+    const lines = part.split('\n').map(s => s.trim()).filter(Boolean);
+    lines.forEach(line => {
+      if (line.startsWith('*') && line.endsWith('*')) {
+        msgs.push({ type: '지문', text: line.slice(1, -1).trim() });
+      } else if (line.startsWith('*')) {
+        // 닫히지 않은 * → 지문으로 처리
+        msgs.push({ type: '지문', text: line.replace(/\*/g,'').trim() });
+      } else {
+        if (line.length > 0) msgs.push({ type: '대사', text: line });
+      }
+    });
+  });
+  return msgs;
+}
+
+function parseTalkFile(data) {
+  // 배열 형태, 최신 순으로 정렬되어 있음 → 역순으로
+  const sorted = [...data].reverse();
+  const turns = [];
+  sorted.forEach((item, i) => {
+    const d = item.content && item.content.data;
+    if (!d) return;
+    const query = (d.query && d.query.ko) || '';
+    const answer = (d.answer && d.answer.ko) || '';
+    const createdAt = item.created_at || '';
+
+    if (query.trim()) {
+      // 유저 입력을 대사/지문으로 분리
+      const userMsgs = parseAnswerText(query) || [{ type: '대사', text: query.trim() }];
+      turns.push({ role: 'user', messages: userMsgs, createdAt });
+    }
+    if (answer.trim()) {
+      turns.push({ role: 'ai', messages: parseAnswerText(answer), createdAt });
+    }
+  });
+  return turns;
+}
+
+function loadFiles(fileList) {
+  Array.from(fileList).forEach(f => {
+    if (!f.name.endsWith('.json')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (files.find(x => x.name === f.name)) return;
+
+        let turns = [];
+        let fileType = '';
+
+        if (Array.isArray(data) && data[0] && data[0].content && data[0].content.data) {
+          // 공식 TalkFile
+          turns = parseTalkFile(data);
+          fileType = 'official';
+        } else if (data.turns && Array.isArray(data.turns)) {
+          // 북마클릿 신형 (role 포함)
+          turns = data.turns;
+          fileType = 'bookmarklet';
+        } else if (data.messages && Array.isArray(data.messages)) {
+          // 북마클릿 구형
+          const msgs = data.messages.map(m => typeof m === 'string' ? {type:'대사', text:m} : m);
+          turns = [{ role:'ai', messages: msgs }];
+          fileType = 'bookmarklet-old';
+        }
+
+        if (!turns.length) { alert(f.name + ': 인식할 수 없는 형식'); return; }
+
+        const saved = fileType === 'official'
+          ? (data[0] && data[0].created_at || '')
+          : (data.saved || '');
+        const url = data.url || '';
+
+        files.push({ name: f.name, saved, url, turns, fileType });
+        files.sort((a, b) => b.saved.localeCompare(a.saved));
+        renderSidebar();
+        if (activeIdx === -1) selectFile(0);
+      } catch(err) { alert(f.name + ' 파싱 실패: ' + err.message); }
+    };
+    reader.readAsText(f);
+  });
+}
+
+// ── 사이드바 ──────────────────────────────────────
+
+function renderSidebar() {
+  const list = document.getElementById('fileList');
+  list.innerHTML = files.map((f, i) => {
+    const d = f.saved ? new Date(f.saved).toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    const label = f.url ? urlToName(f.url) : f.name.replace(/^(caveduck_|TalkFile_caveduck-)/, '').replace('.json','').slice(0,20);
+    const aiCount = f.turns.filter(t => t.role === 'ai').length;
+    const badge = f.fileType === 'official' ? '🗂' : '🔖';
+    return `<div class="file-item${i===activeIdx?' active':''}" onclick="selectFile(${i})">
+      <div class="file-name">${badge} ${escHtml(label)}</div>
+      <div class="file-meta">${d} · ${aiCount}회</div>
+    </div>`;
+  }).join('');
+  updateStats();
+}
+
+function urlToName(url) {
+  const m = url.match(/\/talk\/([^/?#]+)/);
+  return m ? '대화 ' + m[1].slice(0,8) + '…' : url;
+}
+
+function selectFile(idx) { activeIdx = idx; renderSidebar(); renderMessages(); }
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p.dataset.f === f));
+  renderMessages();
+}
+function doSearch() { renderMessages(); }
+
+// ── 렌더링 ────────────────────────────────────────
+
+function renderMessages() {
+  const main = document.getElementById('mainArea');
+  if (activeIdx < 0 || !files[activeIdx]) return;
+  const f = files[activeIdx];
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  const title = f.url ? urlToName(f.url) : f.name.replace(/^(caveduck_|TalkFile_caveduck-)/, '').replace('.json','');
+  const dateStr = f.saved ? new Date(f.saved).toLocaleString('ko-KR') : '';
+
+  // AI 턴 기준으로 쌍 구성
+  const pairs = [];
+  for (let i = 0; i < f.turns.length; i++) {
+    const t = f.turns[i];
+    if (t.role === 'ai') {
+      const prev = f.turns[i-1];
+      const userTurn = (prev && prev.role === 'user') ? prev : null;
+      pairs.push({ userTurn, aiTurn: t, idx: pairs.length + 1 });
+    } else if (t.role === 'user') {
+      const next = f.turns[i+1];
+      if (!next || next.role !== 'ai') {
+        pairs.push({ userTurn: t, aiTurn: null, idx: pairs.length + 1 });
+      }
+    }
+  }
+  // role 없는 구버전
+  if (f.turns.length > 0 && f.turns[0].role === undefined) {
+    pairs.length = 0;
+    f.turns.forEach((t, i) => pairs.push({ userTurn: null, aiTurn: t, idx: i+1 }));
+  }
+
+  const rendered = [];
+  pairs.forEach(pair => {
+    const userMsgs = pair.userTurn ? pair.userTurn.messages : [];
+    const aiMsgs = pair.aiTurn ? pair.aiTurn.messages : [];
+    const aiFiltered = currentFilter === 'all' ? aiMsgs : aiMsgs.filter(m => m.type === currentFilter);
+    const allText = [...userMsgs, ...aiMsgs].map(m => m.text.toLowerCase()).join(' ');
+    if (q && !allText.includes(q)) return;
+
+    // 시간
+    const timeStr = pair.aiTurn && pair.aiTurn.createdAt
+      ? new Date(pair.aiTurn.createdAt).toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})
+      : '';
+
+    // 유저 말풍선
+    let userHtml = '';
+    if (userMsgs.length > 0) {
+      const userText = userMsgs.map(m => m.text).join(' ');
+      userHtml = `<div class="user-side">
+        <div class="user-bubble">${q ? highlight(escHtml(userText), q) : escHtml(userText)}</div>
+      </div>`;
+    }
+
+    // AI 응답
+    let aiHtml = '';
+    if (aiFiltered.length > 0) {
+      const lines = aiFiltered.map(m => {
+        const isNarr = m.type === '지문';
+        const display = q ? highlight(escHtml(m.text), q) : escHtml(m.text);
+        return `<div class="msg-line ${isNarr?'narration':'dialogue'}">${display}</div>`;
+      }).join('');
+      aiHtml = `<div class="ai-side">${lines}</div>`;
+    }
+
+    if (!userHtml && !aiHtml) return;
+
+    rendered.push(`
+      <div class="chat-pair${q && allText.includes(q) ? ' has-match' : ''}">
+        <div class="chat-pair-header">
+          <span class="pair-num">#${pair.idx}</span>
+          ${timeStr ? `<span class="pair-time">${timeStr}</span>` : ''}
+        </div>
+        ${userHtml}${aiHtml}
+      </div>`);
+  });
+
+  if (!rendered.length) {
+    main.innerHTML = `<div class="result-header">
+      <div class="result-title">${escHtml(title)}</div>
+      <div class="result-count">${dateStr}</div>
+    </div><div class="no-results">검색 결과가 없습니다 🔍</div>`;
+    return;
+  }
+
+  main.innerHTML = `<div class="result-header">
+    <div class="result-title">${escHtml(title)}</div>
+    <div class="result-count">${dateStr} · ${q ? rendered.length+'/'+pairs.length : pairs.length}회</div>
+  </div><div class="chat-list">${rendered.join('')}</div>`;
+}
+
+function highlight(text, q) {
+  return text.replace(new RegExp(escRegex(q), 'gi'), m => `<mark>${m}</mark>`);
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function updateStats() {
+  const total = files.reduce((a, f) => a + f.turns.filter(t => !t.role || t.role==='ai').length, 0);
+  document.getElementById('statsText').textContent =
+    files.length ? `${files.length}개 파일 · ${total}회` : '파일 없음';
+}
+
+function exportCurrent() {
+  const target = activeIdx >= 0 ? [files[activeIdx]] : files;
+  if (!target.length) { alert('불러온 파일이 없습니다'); return; }
+  const lines = target.map(f => {
+    const header = `=== ${f.url || f.name} (${f.saved}) ===\n`;
+    const rows = f.turns.map(t => {
+      const label = t.role === 'user' ? '[유저]' : '[AI]';
+      return label + '\n' + t.messages.map(m => `(${m.type}) ${m.text}`).join('\n');
+    });
+    return header + rows.join('\n\n');
+  }).join('\n\n\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(lines);
+  a.download = 'caveduck_export_' + Date.now() + '.txt';
+  a.click();
+}
+</script>
+</body>
+</html>
